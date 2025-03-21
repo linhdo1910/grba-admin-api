@@ -1,9 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 const PDFDocument = require('pdfkit');
-const Order = require('../models/Orders');  // 👈 Sửa lại đúng tên file thực tế
+const Order = require('../models/Orders');
 const Product = require('../models/Products');
 const mongoose = require('mongoose');
+
 /**
  * Lấy danh sách đơn hàng (Admin)
  */
@@ -46,9 +47,15 @@ exports.getOrderById = async (req, res) => {
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
+
+    // Kiểm tra quyền truy cập: chỉ user sở hữu hoặc admin mới xem được
+    if (req.user.role !== 'admin' && order.userId?.toString() !== req.user.userId) {
+      return res.status(403).json({ message: "Forbidden: You can only view your own orders" });
+    }
+
     res.status(200).json(order);
-  } catch {
-    res.status(500).json({ message: "Internal Server Error" });
+  } catch (error) {
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 };
 
@@ -72,8 +79,8 @@ exports.createOrder = async (req, res) => {
     }
 
     const newOrder = new Order({
-      userId: req.session?.userId || null,
-      userName: req.session?.userName || "Guest",
+      userId: req.user.userId || null,
+      userName: shipTo.fullName || "Guest",
       products,
       shipTo,
       shippingFee,
@@ -82,7 +89,11 @@ exports.createOrder = async (req, res) => {
       totalPrice,
       paymentMethod,
       status: "Pending",
-      transactionHistory: [{ action: "CREATE_ORDER", details: { createdBy: req.session?.userId || "Guest" }, status: "Pending" }]
+      transactionHistory: [{
+        action: "CREATE_ORDER",
+        details: { createdBy: req.user.userId || "Guest" },
+        status: "Pending"
+      }]
     });
 
     await newOrder.save();
@@ -105,23 +116,23 @@ exports.updateOrderStatus = async (req, res) => {
       return res.status(400).json({ message: "Invalid order status." });
     }
 
-    const order = await Order.findByIdAndUpdate(req.params.id, { status }, { new: true });
-
+    const order = await Order.findById(req.params.id);
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
 
+    order.status = status;
     order.transactionHistory.push({
       action: "UPDATE_STATUS",
-      details: { updatedBy: req.session?.userId || "Admin" },
+      details: { updatedBy: req.user.userId || "Admin" },
       status
     });
 
     await order.save();
 
     res.status(200).json({ message: "Order status updated successfully" });
-  } catch {
-    res.status(500).json({ message: "Failed to update order status" });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to update order status", error: error.message });
   }
 };
 
@@ -137,23 +148,28 @@ exports.deleteOrder = async (req, res) => {
     }
 
     res.status(200).json({ message: "Order deleted successfully" });
-  } catch {
-    res.status(500).json({ message: "Failed to delete order" });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to delete order", error: error.message });
   }
 };
 
+/**
+ * Tạo hóa đơn PDF
+ */
 exports.generateInvoice = async (req, res) => {
   try {
     const { orderId } = req.params;
 
-    // Lấy thông tin đơn hàng
     const order = await Order.findById(orderId).populate('products.productId');
-
     if (!order) {
       return res.status(404).json({ message: 'Order not found' });
     }
 
-    // Tạo thư mục invoices nếu chưa có
+    // Kiểm tra quyền truy cập: chỉ user sở hữu hoặc admin
+    if (req.user.role !== 'admin' && order.userId?.toString() !== req.user.userId) {
+      return res.status(403).json({ message: "Forbidden: You can only generate invoice for your own orders" });
+    }
+
     const invoiceDir = path.join(__dirname, '../invoices');
     if (!fs.existsSync(invoiceDir)) {
       fs.mkdirSync(invoiceDir);
@@ -166,35 +182,30 @@ exports.generateInvoice = async (req, res) => {
     const stream = fs.createWriteStream(filePath);
     doc.pipe(stream);
 
-    // 📌 Dùng font hỗ trợ Unicode (Roboto hoặc font có sẵn)
-    const fontPath = path.join(__dirname, '../fonts/Roboto-Regular.ttf'); 
+    const fontPath = path.join(__dirname, '../fonts/Roboto-Regular.ttf');
     if (fs.existsSync(fontPath)) {
-      doc.font(fontPath); // Sử dụng font UTF-8
+      doc.font(fontPath);
     } else {
       console.warn('⚠️ Font không tồn tại, đang dùng font mặc định của PDFKit');
     }
 
-    // Logo (nếu có)
-    const logoPath = path.join(__dirname, '../assets/logo.png');
+    const logoPath = path.join(__dirname, '../assets/Logo.png'); //C:\Users\Admin\Documents\Học\Web\codefinal\grba-admin-ui\src\assets\Logo.png
     if (fs.existsSync(logoPath)) {
       doc.image(logoPath, 50, 30, { width: 100 });
     }
 
-    // Tiêu đề
-    doc.fontSize(20).text('HÓA ĐƠN BÁN HÀNG', 150, 50, { align: 'center' }).moveDown();
+    doc.fontSize(20).text('INVOICE', 150, 50, { align: 'center' }).moveDown();
 
-    // Thông tin đơn hàng
     doc.fontSize(12)
-      .text(`Mã đơn hàng: ${orderId}`)
-      .text(`Ngày tạo: ${new Date(order.createdAt).toLocaleDateString()}`)
-      .text(`Khách hàng: ${order.shipTo.fullName}`)
+      .text(`Order ID: ${orderId}`)
+      .text(`Order date: ${new Date(order.createdAt).toLocaleDateString()}`)
+      .text(`Customer: ${order.shipTo.fullName}`)
       .text(`Email: ${order.shipTo.email}`)
-      .text(`Số điện thoại: ${order.shipTo.phone}`)
-      .text(`Địa chỉ: ${order.shipTo.address}`)
+      .text(`Phone Number: ${order.shipTo.phone}`)
+      .text(`Address: ${order.shipTo.address}`)
       .moveDown();
 
-    // Tiêu đề bảng sản phẩm
-    doc.fontSize(14).text('Chi tiết đơn hàng:', { underline: true }).moveDown();
+    doc.fontSize(14).text('Order Details:', { underline: true }).moveDown();
 
     const columnWidths = [50, 200, 70, 100, 100];
     const tableStartX = 50;
@@ -217,7 +228,7 @@ exports.generateInvoice = async (req, res) => {
       doc.moveTo(currentX, yStart).lineTo(currentX, yStart + rowCount * 20).stroke();
     };
 
-    const header = ['STT', 'Tên sản phẩm', 'Số lượng', 'Đơn giá', 'Thành tiền'];
+    const header = ['STT', 'Product Name', 'Quantity', 'Price', 'Total'];
     const headerY = doc.y;
 
     header.forEach((text, i) => {
@@ -252,34 +263,43 @@ exports.generateInvoice = async (req, res) => {
     const totalRows = order.products.length + 1;
     drawTableBorders(tableStartY, totalRows);
 
-    // Tổng tiền
     doc.moveDown(2);
     doc.fontSize(12)
-      .text(`Tổng giá trị: ${order.totalPrice.toLocaleString()} VND`, 50, doc.y, { align: 'right' })
+      .text(`Total: ${order.totalPrice.toLocaleString()} VND`, 50, doc.y, { align: 'right' })
       .moveDown(0.5)
-      .text(`Phương thức thanh toán: ${order.paymentMethod}`, 50, doc.y, { align: 'right' });
+      .text(`Payment method: ${order.paymentMethod}`, 50, doc.y, { align: 'right' });
 
-    // Cảm ơn
     doc.moveDown(2);
     doc.fontSize(12)
-      .text('Cảm ơn bạn đã mua hàng!', 50, doc.y, { align: 'center' })
+      .text('Thank you for purchasing!', 50, doc.y, { align: 'center' })
       .moveDown(0.5)
-      .text('Liên hệ với chúng tôi: 037 500 1528', 50, doc.y, { align: 'center' });
+      .text('Contact with us: 0123456789', 50, doc.y, { align: 'center' });
 
     doc.end();
 
-    // Gửi file về client
     stream.on('finish', () => {
       res.download(filePath, fileName, (err) => {
         if (err) {
           res.status(500).json({ message: 'Failed to download PDF' });
         }
-        fs.unlink(filePath, () => { });
+        fs.unlink(filePath, () => {});
       });
     });
-
   } catch (error) {
     res.status(500).json({ message: 'Internal Server Error', error: error.message });
+  }
+};
+
+exports.getOrderHistory = async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: "Invalid user ID format." });
+    }
+    const orders = await Order.find({ userId }).populate('userId', 'name email');
+    res.status(200).json(orders);
+  } catch (error) {
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 };
 
@@ -291,4 +311,3 @@ module.exports = {
   deleteOrder: exports.deleteOrder,
   generateInvoice: exports.generateInvoice
 };
-

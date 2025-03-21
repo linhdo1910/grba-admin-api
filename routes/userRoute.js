@@ -1,21 +1,45 @@
 const express = require('express');
+const jwt = require('jsonwebtoken');
 const userController = require('../controllers/userController');
 
+const router = express.Router();
+
 function requireAuth(req, res, next) {
-  if (!req.session.userId) {
-    return res.status(401).json({ message: "Unauthorized" });
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ message: "Unauthorized: No token provided" });
   }
-  next();
+
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'jwt_secret');
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(401).json({ message: "Unauthorized: Invalid token" });
+  }
 }
 
 function requireAdmin(req, res, next) {
-  if (!req.session.userId || req.session.role !== 'admin') {
-    return res.status(403).json({ message: "Forbidden" });
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ message: "Unauthorized: No token provided" });
   }
-  next();
-}
 
-const router = express.Router();
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'jwt_secret');
+    console.log('Decoded token:', decoded); // Debug: In ra payload của token
+    console.log('Role check:', decoded.role, decoded.role === 'admin'); // Debug: Kiểm tra role
+    if (decoded.role !== 'admin') {
+      return res.status(403).json({ message: "Forbidden: Admin access required" });
+    }
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(401).json({ message: "Unauthorized: Invalid token", error: error.message });
+  }
+}
 
 router.post("/signup", userController.signup);
 router.post("/login", userController.login);

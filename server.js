@@ -27,6 +27,14 @@ app.use(session({
 }));
 
 // 🛠 Kiểm tra từng dòng xem lỗi đến từ đâu!
+
+const cors = require('cors');
+
+app.use(cors({
+  origin: 'http://localhost:4200', // Đổi thành domain của front-end
+  credentials: true
+}));
+
 app.use("/api/users", userRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);

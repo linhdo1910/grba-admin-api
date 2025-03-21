@@ -1,4 +1,6 @@
 const Product = require('../models/Products');
+const mongoose = require('mongoose');
+
 
 /**
  * Lấy danh sách sản phẩm (hỗ trợ phân trang & lọc theo danh mục)
@@ -48,44 +50,61 @@ exports.getProductById = async (req, res) => {
  */
 exports.createProduct = async (req, res) => {
   try {
-    if (Array.isArray(req.body)) {
-      // Nếu body là một danh sách sản phẩm → Chèn tất cả vào database
-      const products = await Product.insertMany(req.body);
-      return res.status(201).json({
-        message: "Products added successfully",
-        productIds: products.map(p => p._id),
-      });
-    } else {
-      // Nếu chỉ có một sản phẩm → Thêm vào database như cũ
-      const { productName, productPrice } = req.body;
+    const { productName, productCategory, productDescription, rating, discount, productPrice } = req.body;
 
-      if (!productName || !productPrice) {
-        return res.status(400).json({ message: "Please provide productName and productPrice." });
-      }
-
-      const newProduct = new Product(req.body);
-      await newProduct.save();
-
-      return res.status(201).json({
-        message: "Product added successfully",
-        productId: newProduct._id,
-      });
+    // Kiểm tra dữ liệu đầu vào
+    if (!productName || !productCategory || !productDescription || rating === undefined || discount === undefined || !productPrice) {
+      return res.status(400).json({ message: "Missing required fields: productName, productCategory, productDescription, rating, discount, productPrice" });
     }
+
+    // Kiểm tra xem sản phẩm đã tồn tại chưa (tránh trùng lặp)
+    const existingProduct = await Product.findOne({ productName });
+    if (existingProduct) {
+      return res.status(400).json({ message: "Product with this name already exists" });
+    }
+
+    const newProduct = new Product(req.body);
+    await newProduct.save();
+
+    return res.status(201).json({
+      message: "Product added successfully",
+      productId: newProduct._id,
+    });
   } catch (error) {
     res.status(500).json({ message: "Failed to add product", error: error.message });
   }
 };
+
 
 /**
  * Cập nhật sản phẩm theo ID
  */
 exports.updateProduct = async (req, res) => {
   try {
-    const updatedProduct = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true });
-
-    if (!updatedProduct) {
-      return res.status(404).json({ message: "Product not found or no changes made" });
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Invalid product ID" });
     }
+
+    const existingProduct = await Product.findById(req.params.id);
+    if (!existingProduct) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    // So sánh dữ liệu cũ và dữ liệu mới
+    const updates = req.body;
+    let isChanged = false;
+    
+    Object.keys(updates).forEach(key => {
+      if (existingProduct[key] !== updates[key]) {
+        isChanged = true;
+      }
+    });
+
+    if (!isChanged) {
+      return res.status(400).json({ message: "No changes detected" });
+    }
+
+    const updatedProduct = await Product.findByIdAndUpdate(req.params.id, updates, { new: true });
 
     res.status(200).json({ message: "Product updated successfully", product: updatedProduct });
   } catch (error) {

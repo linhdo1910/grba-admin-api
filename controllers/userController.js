@@ -1,4 +1,5 @@
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
 /**
@@ -56,13 +57,17 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password." });
     }
 
-    req.session.userId = user._id;
-    req.session.isLoggedIn = true;
-    req.session.role = user.role;
+    // Tạo JWT token
+    const token = jwt.sign(
+      { userId: user._id, role: user.role },
+      process.env.JWT_SECRET || 'jwt_secret',
+      { expiresIn: '1d' } // Token hết hạn sau 1 ngày
+    );
 
     res.status(200).json({
       userId: user._id,
       role: user.role,
+      token, // Trả về token cho client
       message: "Login successful"
     });
   } catch (error) {
@@ -74,13 +79,8 @@ exports.login = async (req, res) => {
  * Đăng xuất
  */
 exports.logout = (req, res) => {
-  req.session.destroy(err => {
-    if (err) {
-      return res.status(500).json({ message: "Could not log out. Try again later." });
-    }
-    res.clearCookie('connect.sid');
-    res.status(200).json({ message: "Logout successful" });
-  });
+  // Với JWT, logout sẽ được xử lý ở client (xóa token), server không cần làm gì
+  res.status(200).json({ message: "Logout successful" });
 };
 
 /**
@@ -88,7 +88,7 @@ exports.logout = (req, res) => {
  */
 exports.getProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.session.userId).select('-password');
+    const user = await User.findById(req.user.userId).select('-password');
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -106,7 +106,6 @@ exports.updateUser = async (req, res) => {
     const { userId } = req.params;
     const updateData = { ...req.body };
 
-    // Không cho phép thay đổi email & password trực tiếp
     delete updateData.email;
     delete updateData.password;
 

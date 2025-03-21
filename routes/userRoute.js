@@ -48,5 +48,6 @@ router.get("/profile", requireAuth, userController.getProfile);
 router.patch("/update/:userId", requireAdmin, userController.updateUser);
 router.delete("/delete/:userId", requireAdmin, userController.deleteUser);
 router.get("/user-management", requireAdmin, userController.getAllUsers);
-
+router.post("/forgot-password", userController.forgotPassword);
+router.post("/reset-password", userController.resetPassword);
 module.exports = router;

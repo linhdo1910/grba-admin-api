@@ -158,4 +158,87 @@ exports.getAllUsers = async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
+}; // Đóng hàm getAllUsers đúng cách
+
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    // Kiểm tra xem email có được cung cấp không
+    if (!email) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Please provide an email." 
+      });
+    }
+
+    // Tìm user theo email
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Email not found in the system." 
+      });
+    }
+
+    // Nếu email tồn tại, trả về thông báo thành công
+    res.status(200).json({ 
+      success: true,
+      message: "Reset password link has been sent to your email.", // Thay đổi message cho giống yêu cầu
+      userId: user._id // Gửi userId để dùng ở bước reset password
+    });
+
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: "Internal Server Error", 
+      error: error.message 
+    });
+  }
+}; // Thêm dấu ngoặc đóng ở đây
+
+exports.resetPassword = async (req, res) => {
+  try {
+    const { userId, password } = req.body;
+
+    if (!userId || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide userId and password."
+      });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 8 characters."
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { password: hashedPassword },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found."
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Password updated successfully."
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message
+    });
+  }
 };
+

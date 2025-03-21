@@ -1,9 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const session = require('express-session');
-const MongoStore = require('connect-mongo');
+const cors = require('cors');
 
-// 🛠 Kiểm tra tên file trước khi import!
 const userRoutes = require('./routes/userRoute'); 
 const productRoutes = require('./routes/productRoute'); 
 const orderRoutes = require('./routes/orderRoute');
@@ -18,21 +16,10 @@ mongoose.connect(process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/TheKansoD
   useUnifiedTopology: true
 });
 
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'secret',
-  resave: false,
-  saveUninitialized: false,
-  store: MongoStore.create({ mongoUrl: process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/TheKansoDB" }),
-  cookie: { secure: false, httpOnly: true, maxAge: 86400000 }
-}));
-
-// 🛠 Kiểm tra từng dòng xem lỗi đến từ đâu!
-
-const cors = require('cors');
-
 app.use(cors({
-  origin: 'http://localhost:4200', // Đổi thành domain của front-end
-  credentials: true
+  origin: 'http://localhost:4200', // Front-end Angular/React/Vue
+  credentials: true,
+  methods: ['GET', 'POST', 'PATCH', 'DELETE']
 }));
 
 app.use("/api/users", userRoutes);

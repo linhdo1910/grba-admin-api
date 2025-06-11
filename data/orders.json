@@ -1,0 +1,131 @@
+
+     [
+      {
+        "order_id": 1001,
+        "customer_id": 501,
+        "employee_id": 101,
+        "order_date": "2023-05-15T08:30:00Z",
+        "order_status": "Delivered",
+        "order_createdat": "2023-05-15T08:30:00Z",
+        "order_required_date": "2023-05-20",
+        "order_shipped_date": "2023-05-18T14:15:00Z",
+        "order_ship_method": "Express",
+        "shipping_info": {
+          "ship_name": "Nguyễn Văn A",
+          "ship_address": "123 Đường ABC",
+          "ship_province": "Hà Nội",
+          "ship_district": "Cầu Giấy",
+          "ship_ward": "Dịch Vọng",
+          "ship_email": "nguyenvana@example.com",
+          "ship_phone": "0912345678",
+          "ship_additional_notes": "Giao hàng giờ hành chính"
+        },
+        "order_items": [
+          {
+            "product_id": 1901101,
+            "product_name": "Red-Fleshed Apple",
+            "quantity": 2,
+            "unit_price": 400000,
+            "discount": 0
+          },
+          {
+            "product_id": 1901103,
+            "product_name": "Thailand Apple",
+            "quantity": 5,
+            "unit_price": 50000,
+            "discount": 5000
+          }
+        ],
+        "payment_info": {
+          "method": "COD",
+          "amount": 1050000,
+          "status": "Completed"
+        },
+        "total_amount": 1050000,
+        "shipping_fee": 30000,
+        "tax_amount": 0
+      },
+      {
+        "order_id": 1002,
+        "customer_id": 502,
+        "employee_id": 102,
+        "order_date": "2023-05-16T10:15:00Z",
+        "order_status": "Processing",
+        "order_createdat": "2023-05-16T10:15:00Z",
+        "order_required_date": "2023-05-22",
+        "order_shipped_date": null,
+        "order_ship_method": "Standard",
+        "shipping_info": {
+          "ship_name": "Trần Thị B",
+          "ship_address": "456 Đường XYZ",
+          "ship_province": "Hồ Chí Minh",
+          "ship_district": "Quận 1",
+          "ship_ward": "Bến Nghé",
+          "ship_email": "tranthib@example.com",
+          "ship_phone": "0987654321",
+          "ship_additional_notes": "Gọi trước khi giao"
+        },
+        "order_items": [
+          {
+            "product_id": 1901102,
+            "product_name": "Kim Dai Mat Apple",
+            "quantity": 10,
+            "unit_price": 55000,
+            "discount": 0
+          }
+        ],
+        "payment_info": {
+          "method": "Bank Transfer",
+          "amount": 550000,
+          "status": "Completed"
+        },
+        "total_amount": 550000,
+        "shipping_fee": 15000,
+        "tax_amount": 0
+      },
+      {
+        "order_id": 1003,
+        "customer_id": 503,
+        "employee_id": null,
+        "order_date": "2023-05-17T15:45:00Z",
+        "order_status": "Pending",
+        "order_createdat": "2023-05-17T15:45:00Z",
+        "order_required_date": "2023-05-25",
+        "order_shipped_date": null,
+        "order_ship_method": "Standard",
+        "shipping_info": {
+          "ship_name": "Lê Văn C",
+          "ship_address": "789 Đường DEF",
+          "ship_province": "Đà Nẵng",
+          "ship_district": "Hải Châu",
+          "ship_ward": "Thanh Bình",
+          "ship_email": "levanc@example.com",
+          "ship_phone": "0909123456",
+          "ship_additional_notes": ""
+        },
+        "order_items": [
+          {
+            "product_id": 1901104,
+            "product_name": "Jujube Apple",
+            "quantity": 1,
+            "unit_price": 250000,
+            "discount": 25000
+          },
+          {
+            "product_id": 1901105,
+            "product_name": "Golden Peach Apple",
+            "quantity": 3,
+            "unit_price": 45000,
+            "discount": 0
+          }
+        ],
+        "payment_info": {
+          "method": "E-Wallet",
+          "amount": 360000,
+          "status": "Pending"
+        },
+        "total_amount": 360000,
+        "shipping_fee": 20000,
+        "tax_amount": 0
+      }
+     ]

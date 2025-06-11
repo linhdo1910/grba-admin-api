@@ -1,10 +1,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const db = require('../firebase.config');
 
-/**
- * Đăng ký người dùng mới
- */
 exports.signup = async (req, res) => {
   try {
     const { name, email, password, phoneNumber, address, profilePicture, role } = req.body;
@@ -13,107 +10,84 @@ exports.signup = async (req, res) => {
       return res.status(400).json({ message: "Please provide name, email, and password." });
     }
 
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
+    const usersRef = db.ref('users');
+    const snapshot = await usersRef.orderByChild('email').equalTo(email).once('value');
+    if (snapshot.exists()) {
       return res.status(409).json({ message: "Email is already registered." });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const newUser = new User({
-      name,
-      email,
-      password: hashedPassword,
-      phoneNumber,
-      address,
-      profilePicture,
-      role: role || 'user'
-    });
+    const newUserRef = usersRef.push();
+    const newUser = {
+      name, email, password: hashedPassword, phoneNumber, address, profilePicture, role: role || 'user'
+    };
 
-    await newUser.save();
-    res.status(201).json({ message: "User registered successfully", userId: newUser._id });
+    await newUserRef.set(newUser);
+    res.status(201).json({ message: "User registered successfully", userId: newUserRef.key });
   } catch (error) {
     res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 };
 
-/**
- * Đăng nhập
- */
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
+    const snapshot = await db.ref('users').orderByChild('email').equalTo(email).once('value');
 
-    if (!email || !password) {
-      return res.status(400).json({ message: "Please provide both email and password." });
-    }
-
-    const user = await User.findOne({ email });
-    if (!user) {
+    if (!snapshot.exists()) {
       return res.status(401).json({ message: "Invalid email or password." });
     }
 
+    const userId = Object.keys(snapshot.val())[0];
+    const user = snapshot.val()[userId];
     const passwordMatch = await bcrypt.compare(password, user.password);
+
     if (!passwordMatch) {
       return res.status(401).json({ message: "Invalid email or password." });
     }
 
-    // Tạo JWT token
     const token = jwt.sign(
-      { userId: user._id, role: user.role },
+      { userId, role: user.role },
       process.env.JWT_SECRET || 'jwt_secret',
-      { expiresIn: '1d' } // Token hết hạn sau 1 ngày
+      { expiresIn: '1d' }
     );
 
-    res.status(200).json({
-      userId: user._id,
-      role: user.role,
-      token, // Trả về token cho client
-      message: "Login successful"
-    });
+    res.status(200).json({ userId, role: user.role, token, message: "Login successful" });
   } catch (error) {
     res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 };
 
-/**
- * Đăng xuất
- */
 exports.logout = (req, res) => {
-  // Với JWT, logout sẽ được xử lý ở client (xóa token), server không cần làm gì
   res.status(200).json({ message: "Logout successful" });
 };
 
-/**
- * Lấy thông tin cá nhân của user (profile)
- */
 exports.getProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId).select('-password');
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+    const snapshot = await db.ref(`users/${req.user.userId}`).once('value');
+    if (!snapshot.exists()) return res.status(404).json({ message: "User not found" });
+    const user = snapshot.val();
+    delete user.password;
     res.status(200).json(user);
   } catch {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
 
-/**
- * Cập nhật thông tin user (không cho phép đổi email & password trực tiếp)
- */
 exports.updateUser = async (req, res) => {
   try {
     const { userId } = req.params;
-    const updateData = { ...req.body };
+    const snapshot = await db.ref(`users/${userId}`).once('value');
+    if (!snapshot.exists()) return res.status(404).json({ message: "User not found" });
 
+    const updateData = { ...req.body };
     delete updateData.email;
     delete updateData.password;
 
-    const updatedUser = await User.findByIdAndUpdate(userId, updateData, { new: true });
-
-    if (!updatedUser) {
-      return res.status(404).json({ message: "User not found" });
-    }
+    await db.ref(`users/${userId}`).update(updateData);
+    const updatedSnapshot = await db.ref(`users/${userId}`).once('value');
+    const updatedUser = updatedSnapshot.val();
+    delete updatedUser.password;
 
     res.status(200).json({ message: "User updated successfully", user: updatedUser });
   } catch (error) {
@@ -121,124 +95,84 @@ exports.updateUser = async (req, res) => {
   }
 };
 
-/**
- * Xóa user
- */
 exports.deleteUser = async (req, res) => {
   try {
     const { userId } = req.params;
-    const deletedUser = await User.findByIdAndDelete(userId);
+    const snapshot = await db.ref(`users/${userId}`).once('value');
+    if (!snapshot.exists()) return res.status(404).json({ message: "User not found" });
 
-    if (!deletedUser) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
+    await db.ref(`users/${userId}`).remove();
     res.status(200).json({ message: "User deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: "Failed to delete user", error: error.message });
   }
 };
 
-/**
- * Lấy danh sách tất cả user có phân trang và tìm kiếm theo tên
- */
 exports.getAllUsers = async (req, res) => {
   try {
     const { page = 1, limit = 10, search = "" } = req.query;
-    const filter = search ? { name: { $regex: search, $options: "i" } } : {};
+    const snapshot = await db.ref('users').once('value');
+    const usersData = snapshot.val() || {};
 
-    const users = await User.find(filter)
-      .skip((page - 1) * limit)
-      .limit(parseInt(limit))
-      .select('-password');
+    let users = Object.entries(usersData).map(([id, user]) => {
+      delete user.password;
+      return { id, ...user };
+    });
 
-    const total = await User.countDocuments(filter);
+    if (search) {
+      users = users.filter(user => user.name?.toLowerCase().includes(search.toLowerCase()));
+    }
 
-    res.status(200).json({ users, total, page: parseInt(page), pages: Math.ceil(total / limit) });
+    const total = users.length;
+    const start = (page - 1) * limit;
+    const paginatedUsers = users.slice(start, start + parseInt(limit));
+
+    res.status(200).json({ users: paginatedUsers, total, page: parseInt(page), pages: Math.ceil(total / limit) });
   } catch (error) {
     res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
-}; // Đóng hàm getAllUsers đúng cách
+};
 
 exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
+    if (!email) return res.status(400).json({ success: false, message: "Please provide an email." });
 
-    // Kiểm tra xem email có được cung cấp không
-    if (!email) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Please provide an email." 
-      });
-    }
+    const snapshot = await db.ref('users').orderByChild('email').equalTo(email).once('value');
+    if (!snapshot.exists()) return res.status(404).json({ success: false, message: "Email not found." });
 
-    // Tìm user theo email
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Email not found in the system." 
-      });
-    }
-
-    // Nếu email tồn tại, trả về thông báo thành công
-    res.status(200).json({ 
+    const userId = Object.keys(snapshot.val())[0];
+    res.status(200).json({
       success: true,
-      message: "Reset password link has been sent to your email.", // Thay đổi message cho giống yêu cầu
-      userId: user._id // Gửi userId để dùng ở bước reset password
+      message: "Reset password link has been sent to your email.",
+      userId
     });
-
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      message: "Internal Server Error", 
-      error: error.message 
-    });
+    res.status(500).json({ success: false, message: "Internal Server Error", error: error.message });
   }
-}; // Thêm dấu ngoặc đóng ở đây
+};
 
 exports.resetPassword = async (req, res) => {
   try {
     const { userId, password } = req.body;
 
     if (!userId || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Please provide userId and password."
-      });
+      return res.status(400).json({ success: false, message: "Please provide userId and password." });
     }
 
     if (password.length < 8) {
-      return res.status(400).json({
-        success: false,
-        message: "Password must be at least 8 characters."
-      });
+      return res.status(400).json({ success: false, message: "Password must be at least 8 characters." });
+    }
+
+    const snapshot = await db.ref(`users/${userId}`).once('value');
+    if (!snapshot.exists()) {
+      return res.status(404).json({ success: false, message: "User not found." });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await User.findByIdAndUpdate(
-      userId,
-      { password: hashedPassword },
-      { new: true }
-    );
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found."
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Password updated successfully."
-    });
+    await db.ref(`users/${userId}`).update({ password: hashedPassword });
+    res.status(200).json({ success: true, message: "Password updated successfully." });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Internal Server Error",
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: "Internal Server Error", error: error.message });
   }
 };
-

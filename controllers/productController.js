@@ -1,24 +1,31 @@
-const Product = require('../models/Products');
-const mongoose = require('mongoose');
-
+const db = require('../firebase.config'); // Firebase Realtime Database instance
 
 /**
- * Lấy danh sách sản phẩm (hỗ trợ phân trang & lọc theo danh mục)
+ * Lấy danh sách sản phẩm (phân trang và lọc theo danh mục)
  */
 exports.getProducts = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
-    const productDept = req.query.dept || "";
+    const categoryId = req.query.category_id || "";
 
-    const filter = productDept ? { productCategory: productDept } : {};
+    const snapshot = await db.ref('products').once('value');
+    const allProducts = snapshot.val() || {};
+    let productsArray = Object.keys(allProducts).map(id => ({
+      id,
+      ...allProducts[id],
+    }));
 
-    const products = await Product.find(filter).skip(skip).limit(limit);
-    const total = await Product.countDocuments(filter);
+    if (categoryId && categoryId !== 'all') {
+      productsArray = productsArray.filter(p => p.category_id === categoryId);
+    }
+
+    const total = productsArray.length;
+    const start = (page - 1) * limit;
+    const paginated = productsArray.slice(start, start + limit);
 
     res.status(200).json({
-      products,
+      products: paginated,
       total,
       page,
       pages: Math.ceil(total / limit),
@@ -33,13 +40,12 @@ exports.getProducts = async (req, res) => {
  */
 exports.getProductById = async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id);
-
+    const snapshot = await db.ref(`products/${req.params.id}`).once('value');
+    const product = snapshot.val();
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
     }
-
-    res.status(200).json(product);
+    res.status(200).json({ id: req.params.id, ...product });
   } catch (error) {
     res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
@@ -50,63 +56,57 @@ exports.getProductById = async (req, res) => {
  */
 exports.createProduct = async (req, res) => {
   try {
-    const { productName, productCategory, productDescription, rating, discount, productPrice } = req.body;
+    const data = req.body;
+    const requiredFields = ['product_id', 'product_name', 'category_id', 'product_price', 'product_description'];
 
-    // Kiểm tra dữ liệu đầu vào
-    if (!productName || !productCategory || !productDescription || rating === undefined || discount === undefined || !productPrice) {
-      return res.status(400).json({ message: "Missing required fields: productName, productCategory, productDescription, rating, discount, productPrice" });
+    for (const field of requiredFields) {
+      if (data[field] === undefined || data[field] === null) {
+        return res.status(400).json({ message: `Missing required field: ${field}` });
+      }
     }
 
-    // Kiểm tra xem sản phẩm đã tồn tại chưa (tránh trùng lặp)
-    const existingProduct = await Product.findOne({ productName });
-    if (existingProduct) {
-      return res.status(400).json({ message: "Product with this name already exists" });
+    const snapshot = await db.ref(`products/${data.product_id}`).once('value');
+    if (snapshot.exists()) {
+      return res.status(400).json({ message: "Product with this ID already exists" });
     }
 
-    const newProduct = new Product(req.body);
-    await newProduct.save();
-
-    return res.status(201).json({
-      message: "Product added successfully",
-      productId: newProduct._id,
-    });
+    await db.ref(`products/${data.product_id}`).set(data);
+    res.status(201).json({ message: "Product added successfully", productId: data.product_id });
   } catch (error) {
     res.status(500).json({ message: "Failed to add product", error: error.message });
   }
 };
-
 
 /**
  * Cập nhật sản phẩm theo ID
  */
 exports.updateProduct = async (req, res) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ message: "Invalid product ID" });
-    }
+    const productId = req.params.id;
+    const snapshot = await db.ref(`products/${productId}`).once('value');
 
-    const existingProduct = await Product.findById(req.params.id);
-    if (!existingProduct) {
+    if (!snapshot.exists()) {
       return res.status(404).json({ message: "Product not found" });
     }
 
-    // So sánh dữ liệu cũ và dữ liệu mới
+    const existingData = snapshot.val();
     const updates = req.body;
+
     let isChanged = false;
-    
-    Object.keys(updates).forEach(key => {
-      if (existingProduct[key] !== updates[key]) {
+    for (const key in updates) {
+      if (JSON.stringify(existingData[key]) !== JSON.stringify(updates[key])) {
         isChanged = true;
+        break;
       }
-    });
+    }
 
     if (!isChanged) {
       return res.status(400).json({ message: "No changes detected" });
     }
 
-    const updatedProduct = await Product.findByIdAndUpdate(req.params.id, updates, { new: true });
-
-    res.status(200).json({ message: "Product updated successfully", product: updatedProduct });
+    await db.ref(`products/${productId}`).update(updates);
+    const updatedSnapshot = await db.ref(`products/${productId}`).once('value');
+    res.status(200).json({ message: "Product updated successfully", product: { id: productId, ...updatedSnapshot.val() } });
   } catch (error) {
     res.status(500).json({ message: "Failed to update product", error: error.message });
   }
@@ -117,12 +117,12 @@ exports.updateProduct = async (req, res) => {
  */
 exports.deleteProduct = async (req, res) => {
   try {
-    const deletedProduct = await Product.findByIdAndDelete(req.params.id);
-
-    if (!deletedProduct) {
+    const snapshot = await db.ref(`products/${req.params.id}`).once('value');
+    if (!snapshot.exists()) {
       return res.status(404).json({ message: "Product not found" });
     }
 
+    await db.ref(`products/${req.params.id}`).remove();
     res.status(200).json({ message: "Product deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: "Failed to delete product", error: error.message });
@@ -140,9 +140,13 @@ exports.deleteMultipleProducts = async (req, res) => {
       return res.status(400).json({ message: "No product IDs provided" });
     }
 
-    const result = await Product.deleteMany({ _id: { $in: productIds } });
+    const updates = {};
+    productIds.forEach(id => {
+      updates[`products/${id}`] = null;
+    });
 
-    res.status(200).json({ message: "Products deleted successfully", deletedCount: result.deletedCount });
+    await db.ref().update(updates);
+    res.status(200).json({ message: "Products deleted successfully", deletedCount: productIds.length });
   } catch (error) {
     res.status(500).json({ message: "Failed to delete products", error: error.message });
   }

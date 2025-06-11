@@ -1,0 +1,97 @@
+[
+    {
+      "name": "Nguyen Phuoc Dang Khoa",
+      "email": "khoa@123",
+      "password": "112233",
+      "gender": "male",
+      "birthDate": {
+        "day": "15",
+        "month": "03",
+        "year": "1990"
+      },
+      "marketing": true,
+      "phoneNumber": "0123456789",
+      "address": "123 Đường Láng, Hà Nội",
+      "role": "admin",
+      "action": "edit all",
+      "profilePicture": "https://example.com/profiles/nguyenvana.jpg",
+      "resetPasswordToken": null,
+      "resetPasswordExpires": null
+    },
+    {
+      "name": "Tran Thi B",
+      "email": "khoakhoa",
+      "password": "112233",
+      "gender": "female",
+      "birthDate": {
+        "day": "22",
+        "month": "07",
+        "year": "1995"
+      },
+      "marketing": false,
+      "phoneNumber": "0987654321",
+      "address": "456 Lê Lợi, TP.HCM",
+      "role": "admin",
+      "action": "edit all",
+      "profilePicture": "https://example.com/profiles/tranthib.jpg",
+      "resetPasswordToken": null,
+      "resetPasswordExpires": null
+    },
+    {
+      "name": "Le Van C",
+      "email": "levanc@example.com",
+      "password": "hashedPassword789",
+      "gender": "male",
+      "birthDate": {
+        "day": "10",
+        "month": "11",
+        "year": "1988"
+      },
+      "marketing": true,
+      "phoneNumber": "0912345678",
+      "address": "789 Trần Phú, Đà Nẵng",
+      "role": "user",
+      "action": "account ctrl",
+      "profilePicture": null,
+      "resetPasswordToken": null,
+      "resetPasswordExpires": null
+    },
+    {
+      "name": "Pham Thi D",
+      "email": "phamthid@example.com",
+      "password": "hashedPassword101",
+      "gender": "female",
+      "birthDate": {
+        "day": "05",
+        "month": "01",
+        "year": "1992"
+      },
+      "marketing": false,
+      "phoneNumber": "0934567890",
+      "address": "101 Nguyễn Huệ, Huế",
+      "role": "user",
+      "action": "sales ctrl",
+      "profilePicture": "https://example.com/profiles/phamthid.jpg",
+      "resetPasswordToken": null,
+      "resetPasswordExpires": null
+    },
+    {
+      "name": "Hoang Van E",
+      "email": "hoangvane@example.com",
+      "password": "hashedPassword202",
+      "gender": "male",
+      "birthDate": {
+        "day": "30",
+        "month": "12",
+        "year": "1998"
+      },
+      "marketing": true,
+      "phoneNumber": "0945678901",
+      "address": "202 Hai Bà Trưng, Cần Thơ",
+      "role": "user",
+      "action": "just view",
+      "profilePicture": null,
+      "resetPasswordToken": null,
+      "resetPasswordExpires": null
+    }
+  ]

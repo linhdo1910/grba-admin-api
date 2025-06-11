@@ -1,26 +1,30 @@
 const mongoose = require('mongoose');
 
 const productSchema = new mongoose.Schema({
-  productName: { type: String, required: true },
-  brandName: { type: String },
-  productPrice: { type: Number, required: true },
-  productDescription: { type: String },
-  productStock: { type: Number, default: 0 },
-  productCategory: { type: String },
-  productSubCategory: { type: String },
-  coverImage: { type: String },
-  images: [{ type: String }],
-  color: { type: String },
-  size: { type: String },
-  materials: { type: String },
-  sort: { type: String },
-  note: { type: String },
-  status: { type: Number, required: true, default: 1 },
-  rating : { type: Number, required: false},
-  reviews : { type: Number, required: false},
-  discount : { type : Number, default: 0, required: false},
-  previousPrice: { type: Number, required: false },
-  // Các trường khác nếu cần...
+  product_id: { type: String, required: true, unique: true },
+  product_name: { type: String, required: true },
+  product_stock: { type: Number, default: 0 },
+  category_id: { type: String, required: true },
+  sub_category_id: { type: String, required: true },
+  product_price: { type: Number, required: true },
+  product_description: { type: String },
+  product_instruction: { type: String },
+  product_images: {
+    image1: { type: String },
+    image2: { type: String },
+    image3: { type: String }
+  },
+  product_rating: { type: String },
+  product_discount: { type: Number, default: 0 },
+  product_reviews: {
+    review1: { type: String },
+    review2: { type: String },
+    review3: { type: String }
+  },
+  product_level: { type: String },
+  water_demand: { type: String },
+  conditions: { type: String },
+  status: { type: Number, default: 1 }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Product', productSchema);

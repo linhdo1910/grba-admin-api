@@ -82,35 +82,40 @@ exports.createProduct = async (req, res) => {
  */
 exports.updateProduct = async (req, res) => {
   try {
-    const productId = req.params.id;
-    const snapshot = await db.ref(`products/${productId}`).once('value');
+    const product_id = req.params.id;
+    const updates = req.body;
 
+    if (!updates || Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: "Không có dữ liệu cập nhật." });
+    }
+
+    const snapshot = await db.ref(`products/${product_id}`).once('value');
     if (!snapshot.exists()) {
-      return res.status(404).json({ message: "Product not found" });
+      return res.status(404).json({ message: "Không tìm thấy sản phẩm." });
     }
 
     const existingData = snapshot.val();
-    const updates = req.body;
 
-    let isChanged = false;
+    // Chỉ giữ lại trường hợp thay đổi
+    const finalUpdates = {};
     for (const key in updates) {
       if (JSON.stringify(existingData[key]) !== JSON.stringify(updates[key])) {
-        isChanged = true;
-        break;
+        finalUpdates[key] = updates[key];
       }
     }
 
-    if (!isChanged) {
-      return res.status(400).json({ message: "No changes detected" });
+    if (Object.keys(finalUpdates).length === 0) {
+      return res.status(400).json({ message: "Không có thay đổi nào." });
     }
 
-    await db.ref(`products/${productId}`).update(updates);
-    const updatedSnapshot = await db.ref(`products/${productId}`).once('value');
-    res.status(200).json({ message: "Product updated successfully", product: { id: productId, ...updatedSnapshot.val() } });
+    await db.ref(`products/${product_id}`).update(finalUpdates);
+    return res.status(200).json({ message: "Cập nhật thành công", product_id });
   } catch (error) {
-    res.status(500).json({ message: "Failed to update product", error: error.message });
+    return res.status(500).json({ message: "Lỗi cập nhật", error: error.message });
   }
 };
+
+
 
 /**
  * Xóa sản phẩm theo ID

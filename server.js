@@ -15,7 +15,8 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // Middleware
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cors({
   origin: 'http://localhost:4200',
   credentials: true,
@@ -26,7 +27,10 @@ app.use(cors({
 const userRoutes = require('./routes/userRoute');
 const productRoutes = require('./routes/productRoute');
 const orderRoutes = require('./routes/orderRoute');
+const blogRoutes = require('./routes/blogRoute');
 
+
+app.use("/api/blogs", blogRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);

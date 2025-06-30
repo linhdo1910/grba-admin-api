@@ -1,14 +1,23 @@
-// Blog.js
-const mongoose = require('mongoose');
+// blogModel.js
 
-const blogSchema = new mongoose.Schema({
-  createDate: { type: Date, default: Date.now }, // Ngày tạo
-  title: { type: String, required: true }, // Tiêu đề
-  content: { type: String, required: true }, // Nội dung
-  image: { type: String, required: true },
-  author:{type:String, required:true} // Đường dẫn đến hình ảnh
-});
+class ContentBlock {
+  constructor(type, value) {
+    this.type = type;   // ví dụ: HEADING, PARAGRAPH, IMAGE
+    this.value = value; // nội dung tương ứng
+  }
+}
 
-const Blog = mongoose.model('Blog', blogSchema);
+class Blog {
+  constructor({ slug, title, author, date, image, content = [] }) {
+    this.slug = slug;       // duy nhất (dùng làm key trên Firebase)
+    this.title = title;
+    this.author = author;
+    this.date = date;       // định dạng yyyy-MM-dd hoặc ISO string
+    this.image = image;     // URL ảnh
+    this.content = content.map(
+      (block) => new ContentBlock(block.type, block.value)
+    );
+  }
+}
 
-module.exports = Blog;
+module.exports = { Blog, ContentBlock };
